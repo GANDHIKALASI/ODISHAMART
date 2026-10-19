@@ -3,7 +3,9 @@
 > **Production-grade Social Commerce Automation & Webhook CRM**  
 > Architected for authentic Odisha handlooms & menswear — powered by **n8n workflows**, **Meta Graph API**, and **WhatsApp Cloud API**.
 
-![ODISHAMART Social Commerce Dashboard](odishamart_dashboard.png)
+<p align="center">
+  <img src="odishamart_logo.jpg" alt="ODISHAMART Konark Logo" width="160" style="border-radius:20px; box-shadow:0 4px 16px rgba(0,0,0,0.15);" />
+</p>
 
 ---
 
