@@ -1,0 +1,1086 @@
+{
+  "id": "YaShlqZfQUINShW8",
+  "name": "Comment-to-DM Product Carousel + WhatsApp Order Desk",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "meta-social-commerce",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "17262471-e9a3-4ede-8273-4bfbdc65a0a0",
+      "name": "Meta Webhook Verify (GET)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "78e90437-9287-4361-b4c8-c4bd2f4db2f6"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.query[\"hub.verify_token\"] }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "replora_meta_verify"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "cd649d6f-b324-4137-ada0-cd6c2979f33b",
+      "name": "Verify Token OK?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        272,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $(\"Meta Webhook Verify (GET)\").item.json.query[\"hub.challenge\"] }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "2ff1de74-99b3-4930-b150-957776a514bb",
+      "name": "Respond Challenge",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        528,
+        -96
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "Forbidden",
+        "options": {
+          "responseCode": 403
+        }
+      },
+      "id": "a14545b7-a3ed-443f-b795-50d1ae73b0a3",
+      "name": "Respond Forbidden",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        528,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "meta-social-commerce",
+        "options": {}
+      },
+      "id": "3747869c-d113-4a7a-ae3b-d39bde4ef352",
+      "name": "Meta Comment Events (POST)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        400
+      ],
+      "webhookId": "1d01b00a-59c2-4e90-a8ec-73cbafe71038"
+    },
+    {
+      "parameters": {
+        "jsCode": "const out = [];\nconst KEYWORDS = ['price','prize','rate','cost','kitne','kitna','kitni','kimat','keemat','daam','details','detail','info','link','buy','order','size','available','availability','chahiye','chaiye','dm','how much','amount','cod','book','booking'];\nfor (const item of $input.all()) {\n  const body = item.json.body || item.json;\n  const entries = body.entry || [];\n  for (const entry of entries) {\n    for (const ch of (entry.changes || [])) {\n      const v = ch.value || {};\n      let rec = null;\n      if (body.object === 'instagram' && ch.field === 'comments') {\n        if (v.parent_id) continue;\n        rec = { platform: 'instagram', accountId: entry.id, commentId: v.id, postId: v.media && v.media.id, mediaType: (v.media && v.media.media_product_type) || 'FEED', commentText: v.text || '', fromId: v.from && v.from.id, fromName: v.from && (v.from.username || v.from.name) };\n      } else if (body.object === 'page' && ch.field === 'feed') {\n        if (v.item !== 'comment' || v.verb !== 'add') continue;\n        if (v.parent_id && v.parent_id !== v.post_id) continue;\n        rec = { platform: 'facebook', accountId: entry.id, commentId: v.comment_id, postId: v.post_id, mediaType: 'POST', commentText: v.message || '', fromId: v.from && v.from.id, fromName: v.from && v.from.name };\n      }\n      if (!rec || !rec.commentId || !rec.fromId) continue;\n      if (String(rec.fromId) === String(entry.id)) continue;\n      const lower = String(rec.commentText).toLowerCase();\n      const words = lower.split(/[^a-z0-9]+/);\n      const hit = KEYWORDS.find(k => k.indexOf(' ') > -1 ? lower.includes(k) : words.includes(k));\n      out.push({ json: Object.assign({}, rec, { buyingIntent: !!hit, matchedKeyword: hit || null }) });\n    }\n  }\n}\nreturn out;"
+      },
+      "id": "e6af5261-1b9f-4e79-b4e5-5aaf7e4ab933",
+      "name": "Normalize Comment Events",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        272,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.buyingIntent }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "7c0000a7-1791-4590-aeff-cc03dda4dcb1",
+      "name": "Buying Intent?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        528,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "cfg-mock",
+              "name": "useMock",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "cfg-shop",
+              "name": "shopDomain",
+              "value": "odishamart.in",
+              "type": "string"
+            },
+            {
+              "id": "cfg-brand",
+              "name": "brandName",
+              "value": "ODISHAMART",
+              "type": "string"
+            },
+            {
+              "id": "cfg-wa",
+              "name": "waNumber",
+              "value": "919999999999",
+              "type": "string"
+            },
+            {
+              "id": "cfg-author",
+              "name": "author",
+              "value": "Gandhi Kalasi",
+              "type": "string"
+            },
+            {
+              "id": "cfg-username",
+              "name": "username",
+              "value": "bug_gandhi",
+              "type": "string"
+            },
+            {
+              "id": "cfg-portfolio",
+              "name": "portfolio",
+              "value": "https://portfolio-one-dun-f2390maeuj.vercel.app/",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "fc001004-4484-475f-848f-0009275e7371",
+      "name": "Store Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        784,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const POST_MAP = {\n  '17900001000000001': ['sambalpuri-ikat-kurta-maroon'],\n  '17900001000000002': ['bomkai-silk-kurta-gold', 'kotpad-organic-kurta-earth'],\n  '10000000001_20000000002': ['pasapalli-nehru-jacket-black']\n};\nconst FALLBACK = ['sambalpuri-ikat-kurta-maroon', 'bomkai-silk-kurta-gold', 'kotpad-organic-kurta-earth'];\nconst out = [];\nfor (const item of $input.all()) {\n  const j = item.json;\n  const mapped = POST_MAP[String(j.postId)];\n  const handles = mapped && mapped.length ? mapped : FALLBACK;\n  handles.slice(0, 10).forEach((h, idx) => {\n    out.push({ json: Object.assign({}, j, { handle: h, handleIndex: idx, mappedBy: mapped ? 'post_map' : 'fallback_bestsellers' }) });\n  });\n}\nreturn out;"
+      },
+      "id": "9f15f77a-d709-4cef-921a-4e7857df340e",
+      "name": "Resolve Products for Post",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.useMock }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "0239b081-0f54-4e01-85b7-5ca14fc28a3b",
+      "name": "Use Mock Data?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1312,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const CATALOG = {\n  'sambalpuri-ikat-kurta-maroon': { id: 9001, title: 'Sambalpuri Ikat Cotton Kurta - Royal Maroon', handle: 'sambalpuri-ikat-kurta-maroon', price: 159900, compare_at_price: 219900, available: true, featured_image: 'https://placehold.co/800x800/png?text=Sambalpuri+Ikat+Kurta', variants: [{ id: 1, option1: 'S', available: true }, { id: 2, option1: 'M', available: true }, { id: 3, option1: 'L', available: true }, { id: 4, option1: 'XL', available: false }] },\n  'bomkai-silk-kurta-gold': { id: 9002, title: 'Bomkai Handloom Tussar Silk Kurta - Konark Gold', handle: 'bomkai-silk-kurta-gold', price: 349900, compare_at_price: 449900, available: true, featured_image: 'https://placehold.co/800x800/png?text=Bomkai+Silk+Kurta', variants: [{ id: 5, option1: 'M', available: true }, { id: 6, option1: 'L', available: true }, { id: 7, option1: 'XL', available: true }] },\n  'kotpad-organic-kurta-earth': { id: 9003, title: 'Kotpad Tribal Weave Kurta - Terracotta Earth', handle: 'kotpad-organic-kurta-earth', price: 189900, compare_at_price: 249900, available: true, featured_image: 'https://placehold.co/800x800/png?text=Kotpad+Organic+Kurta', variants: [{ id: 8, option1: 'S', available: true }, { id: 9, option1: 'M', available: true }, { id: 10, option1: 'L', available: true }] },\n  'pasapalli-nehru-jacket-black': { id: 9004, title: 'Pasapalli Check Silk Nehru Jacket - Onyx & Red', handle: 'pasapalli-nehru-jacket-black', price: 289900, compare_at_price: 359900, available: true, featured_image: 'https://placehold.co/800x800/png?text=Pasapalli+Nehru+Jacket', variants: [{ id: 11, option1: 'M', available: true }, { id: 12, option1: 'L', available: true }, { id: 13, option1: 'XL', available: true }] }\n};\nreturn $input.all().map(item => {\n  const p = CATALOG[item.json.handle];\n  return { json: p ? p : { status: 404, description: 'Product not found' } };\n});"
+      },
+      "id": "650ae103-cfad-4d77-a4f2-c09eea8c4291",
+      "name": "Mock Shopify Catalog",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1568,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const NL = String.fromCharCode(10);\nconst ctxItems = $('Resolve Products for Post').all();\nconst prods = $input.all();\nconst groups = {};\nconst rupees = (paise) => '₹' + (Number(paise) / 100).toLocaleString('en-IN');\nprods.forEach((it, i) => {\n  const ctx = (ctxItems[i] && ctxItems[i].json) || {};\n  const p = it.json || {};\n  if (!p.title || !ctx.commentId) return;\n  const productUrl = 'https://' + ctx.shopDomain + '/products/' + p.handle + '?utm_source=' + ctx.platform + '&utm_medium=comment_dm&utm_campaign=comment_to_dm';\n  const variants = Array.isArray(p.variants) ? p.variants : [];\n  const sizes = variants.filter(v => v.available).map(v => v.option1).filter(Boolean);\n  const inStock = p.available !== false && (variants.length === 0 || sizes.length > 0);\n  const mrp = Number(p.compare_at_price) > Number(p.price) ? ' (MRP ' + rupees(p.compare_at_price) + ')' : '';\n  const subtitle = (rupees(p.price) + mrp + ' • ' + (inStock ? 'Sizes: ' + sizes.join('/') : 'Sold out')).slice(0, 80);\n  let img = p.featured_image || (p.images && p.images[0]) || '';\n  if (String(img).indexOf('//') === 0) img = 'https:' + img;\n  const el = {\n    title: String(p.title).slice(0, 80),\n    subtitle: subtitle,\n    image_url: img,\n    default_action: { type: 'web_url', url: productUrl },\n    buttons: [\n      { type: 'web_url', url: productUrl, title: inStock ? 'Buy Now' : 'View Product' },\n      { type: 'web_url', url: 'https://wa.me/' + ctx.waNumber + '?text=' + encodeURIComponent('ORDER ' + p.handle), title: 'Order on WhatsApp' }\n    ]\n  };\n  if (!groups[ctx.commentId]) groups[ctx.commentId] = { ctx: ctx, elements: [], lines: [] };\n  groups[ctx.commentId].elements.push(el);\n  groups[ctx.commentId].lines.push('• ' + p.title + ' - ' + rupees(p.price) + NL + productUrl);\n});\nreturn Object.keys(groups).map(cid => {\n  const g = groups[cid];\n  const c = g.ctx;\n  const carouselBody = { recipient: { comment_id: c.commentId }, message: { attachment: { type: 'template', payload: { template_type: 'generic', elements: g.elements.slice(0, 10) } } } };\n  const fallbackBody = { recipient: { comment_id: c.commentId }, message: { text: 'Hi ' + (c.fromName || '') + '! 👋 Aapne ' + c.brandName + ' ki post pe poocha tha. Yeh rahe details:' + NL + NL + g.lines.join(NL + NL) } };\n  return { json: {\n    platform: c.platform,\n    accountId: c.accountId,\n    commentId: c.commentId,\n    fromName: c.fromName,\n    postId: c.postId,\n    matchedKeyword: c.matchedKeyword,\n    productCount: g.elements.length,\n    carouselBody: carouselBody,\n    fallbackBody: fallbackBody,\n    publicReplyText: 'Hi ' + (c.fromName || '') + '! Details aapke DM mein bhej diye hain 📩 (Message requests bhi check kar lijiye)'\n  } };\n});"
+      },
+      "id": "18af3f08-0d6d-4de3-bbab-027a32eb809a",
+      "name": "Build Product Carousel",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1824,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://{{ $json.shopDomain }}/products/{{ $json.handle }}.js",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 10000
+        }
+      },
+      "id": "247f023b-66df-4620-9883-c066a43eea74",
+      "name": "Fetch Product from Shopify Store",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1568,
+        528
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v21.0/{{ $json.accountId }}/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "facebookGraphApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.carouselBody) }}",
+        "options": {}
+      },
+      "id": "4f101f1e-100b-475b-b6c2-fdde4787f69f",
+      "name": "Send Product Carousel DM",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2080,
+        304
+      ],
+      "credentials": {
+        "facebookGraphApi": {
+          "id": "gttLUA51E1Mz86ft",
+          "name": "Facebook Graph account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v21.0/{{ $(\"Build Product Carousel\").item.json.accountId }}/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "facebookGraphApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($(\"Build Product Carousel\").item.json.fallbackBody) }}",
+        "options": {}
+      },
+      "id": "45ba97e6-bbdd-4ea8-8bef-a429f964339b",
+      "name": "Fallback Text DM with Links",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2352,
+        432
+      ],
+      "credentials": {
+        "facebookGraphApi": {
+          "id": "gttLUA51E1Mz86ft",
+          "name": "Facebook Graph account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v21.0/{{ $json.commentId }}/{{ $json.platform === \"instagram\" ? \"replies\" : \"comments\" }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "facebookGraphApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ message: $json.publicReplyText }) }}",
+        "options": {}
+      },
+      "id": "b284c5cf-7cc8-406f-8e4d-73dd2bcbb9d9",
+      "name": "Public Reply on Comment",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2080,
+        544
+      ],
+      "credentials": {
+        "facebookGraphApi": {
+          "id": "gttLUA51E1Mz86ft",
+          "name": "Facebook Graph account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "updates": [
+          "messages"
+        ],
+        "options": {}
+      },
+      "id": "0d9276be-3752-4a2a-8ada-da18482f80cd",
+      "name": "WhatsApp Message Trigger",
+      "type": "n8n-nodes-base.whatsAppTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        1104
+      ],
+      "webhookId": "5eb4352e-c6c8-4451-a52d-4486f5c703e5",
+      "credentials": {
+        "whatsAppTriggerApi": {
+          "id": "dCH89Pa7HwnadFU5",
+          "name": "N8N"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const out = [];\nconst TRACK = ['track','status','kahan','kaha','where','delivery','deliver','shipment','parcel','courier','dispatch','aayega','pahunch','pohch'];\nconst SUPPORT = ['cancel','return','refund','exchange','wapas','replace','complaint','damage','wrong'];\nfor (const item of $input.all()) {\n  const j = item.json;\n  const m = j.messages && j.messages[0];\n  if (!m) continue;\n  let text = '';\n  if (m.type === 'text') text = (m.text && m.text.body) || '';\n  else if (m.type === 'button') text = (m.button && (m.button.text || m.button.payload)) || '';\n  else if (m.type === 'interactive' && m.interactive) {\n    const r = m.interactive.button_reply || m.interactive.list_reply || {};\n    text = r.id || r.title || '';\n  }\n  const raw = String(text).trim();\n  const lower = raw.toLowerCase();\n  const idMatch = raw.match(/ord[- ]?#?([0-9]{4,})/i) || raw.match(/#([0-9]{4,})/);\n  const orderId = idMatch ? 'ORD-' + idMatch[1] : null;\n  const orderCmd = raw.match(/^order[ ]+([a-z0-9-]+)$/i);\n  let intent = 'menu';\n  let handle = null;\n  if (orderCmd && !idMatch) { intent = 'new_order'; handle = orderCmd[1].toLowerCase(); }\n  else if (SUPPORT.some(w => lower.includes(w))) intent = 'support';\n  else if (orderId || TRACK.some(w => lower.includes(w))) intent = 'track';\n  else if (lower.includes('my order') || lower.includes('orders') || lower.includes('history')) intent = 'my_orders';\n  const name = (j.contacts && j.contacts[0] && j.contacts[0].profile && j.contacts[0].profile.name) || 'there';\n  out.push({ json: { phone: m.from, name: name, text: raw, intent: intent, orderId: orderId, handle: handle, msgId: m.id } });\n}\nreturn out;"
+      },
+      "id": "6c0a411f-af23-4365-92f5-aba34c9cf42d",
+      "name": "Parse WhatsApp Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        272,
+        1104
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const ORDERS = [\n  { id: 'ORD-10460', phone: '919876543210', placedOn: '17 Oct 2026', placedTs: 1760691000000, status: 'processing', items: [{ title: 'Bomkai Handloom Tussar Silk Kurta - Konark Gold', size: 'L', qty: 1, price: 3499 }, { title: 'Sambalpuri Ikat Cotton Kurta - Royal Maroon', size: 'XL', qty: 1, price: 1599 }], total: 5098, payment: 'Prepaid (Card)', courier: null, awb: null, trackingUrl: null, eta: 'Dispatch 18 Oct tak', timeline: [{ done: true, label: 'Order placed', at: '17 Oct, 02:10 PM' }, { done: false, label: 'Packed', at: 'Pending' }, { done: false, label: 'Shipped', at: 'Pending' }, { done: false, label: 'Delivered', at: 'Pending' }] },\n  { id: 'ORD-10452', phone: '919876543210', placedOn: '15 Oct 2026', placedTs: 1760507400000, status: 'out_for_delivery', items: [{ title: 'Sambalpuri Ikat Cotton Kurta - Royal Maroon', size: 'M', qty: 1, price: 1599 }], total: 1599, payment: 'Prepaid (UPI)', courier: 'Delhivery', awb: 'DLV8847261903', trackingUrl: 'https://www.delhivery.com/track/package/DLV8847261903', eta: 'Aaj shaam 8 baje tak', timeline: [{ done: true, label: 'Order placed', at: '15 Oct, 11:20 AM' }, { done: true, label: 'Packed', at: '15 Oct, 06:45 PM' }, { done: true, label: 'Shipped', at: '16 Oct, 10:10 AM' }, { done: true, label: 'Out for delivery', at: '17 Oct, 08:30 AM' }, { done: false, label: 'Delivered', at: 'Pending' }] },\n  { id: 'ORD-10431', phone: '919876543210', placedOn: '09 Oct 2026', placedTs: 1760000000000, status: 'delivered', items: [{ title: 'Nuapatna Khandua Pata Kurta - Royal Blue', size: 'M', qty: 1, price: 2999 }], total: 2999, payment: 'COD', courier: 'Bluedart', awb: 'BD55120987', trackingUrl: 'https://www.bluedart.com/tracking', eta: 'Delivered 12 Oct', timeline: [{ done: true, label: 'Order placed', at: '09 Oct, 09:05 AM' }, { done: true, label: 'Shipped', at: '10 Oct, 12:30 PM' }, { done: true, label: 'Delivered', at: '12 Oct, 04:40 PM' }] },\n  { id: 'ORD-10399', phone: '919811122233', placedOn: '05 Oct 2026', placedTs: 1759650000000, status: 'shipped', items: [{ title: 'Habaspuri Traditional Weave Kurta - Indigo', size: 'L', qty: 1, price: 1499 }], total: 1499, payment: 'Prepaid (UPI)', courier: 'Shiprocket', awb: 'SR90012345', trackingUrl: 'https://shiprocket.co/tracking/SR90012345', eta: '19 Oct tak', timeline: [{ done: true, label: 'Order placed', at: '05 Oct, 05:00 PM' }, { done: true, label: 'Shipped', at: '16 Oct, 11:00 AM' }, { done: false, label: 'Delivered', at: 'Pending' }] }\n];\nreturn $input.all().map(item => {\n  const mine = ORDERS.filter(o => o.phone === item.json.phone).sort((a, b) => b.placedTs - a.placedTs);\n  return { json: Object.assign({}, item.json, { orders: mine, orderCount: mine.length }) };\n});"
+      },
+      "id": "70553590-1d69-4923-85b0-71d75b5ac19d",
+      "name": "Fetch Customer Orders (Mock)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        528,
+        1104
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.intent }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "track"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "track"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.intent }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "my_orders"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "my_orders"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.intent }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "new_order"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "new_order"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.intent }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "support"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "support"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "menu"
+        }
+      },
+      "id": "448e80aa-c8da-4dbb-b515-4d3c24b76669",
+      "name": "Route by Intent",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        784,
+        1104
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const NL = String.fromCharCode(10);\nconst LABEL = { processing: '📦 Packing in progress', shipped: '🚚 Shipped', out_for_delivery: '🛵 Out for Delivery', delivered: '✅ Delivered' };\nreturn $input.all().map(item => {\n  const c = item.json;\n  const orders = c.orders || [];\n  const o = c.orderId ? orders.find(x => x.id === c.orderId) : orders[0];\n  let reply;\n  if (!o) {\n    reply = 'Hi ' + c.name + '! 🙏 ' + (c.orderId ? c.orderId + ' is number pe nahi mila.' : 'Is number pe koi order nahi mila.') + NL + 'Order number check karke dobara bhejiye (e.g. ORD-10452) ya *MENU* likhiye.';\n  } else {\n    const items = o.items.map(i => '• ' + i.title + ' (' + i.size + ') x' + i.qty).join(NL);\n    const tl = o.timeline.map(t => (t.done ? '✅ ' : '⏳ ') + t.label + ' - ' + t.at).join(NL);\n    const lines = [\n      '📦 *Order ' + o.id + '*',\n      'Status: ' + (LABEL[o.status] || o.status),\n      '',\n      items,\n      'Total: ₹' + o.total.toLocaleString('en-IN') + ' (' + o.payment + ')'\n    ];\n    if (o.courier) lines.push('Courier: ' + o.courier + ' | AWB: ' + o.awb);\n    lines.push('ETA: ' + o.eta);\n    if (o.trackingUrl) lines.push('🔗 Live tracking: ' + o.trackingUrl);\n    lines.push('', '*Timeline*', tl, '', 'Cancel / return ke liye *CANCEL ' + o.id + '* likhiye. Menu ke liye *MENU*.');\n    reply = lines.join(NL);\n  }\n  return { json: { phone: c.phone, reply: reply } };\n});"
+      },
+      "id": "4609fe7b-08e0-4371-97c0-476771f57913",
+      "name": "Format Tracking Reply",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1072,
+        880
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "1073227029211574",
+        "recipientPhoneNumber": "={{ $json.phone }}",
+        "textBody": "={{ $json.reply }}",
+        "additionalFields": {}
+      },
+      "id": "cea75395-1e70-4c98-83c4-bda43cd14b2a",
+      "name": "Send WhatsApp Reply",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        1344,
+        1200
+      ],
+      "webhookId": "638707f1-eae3-4574-ab7a-aec1f570d23a",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "BjaFXuiyFNg1bVAy",
+          "name": "whatsapp permanent token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const NL = String.fromCharCode(10);\nconst LABEL = { processing: '📦 Packing', shipped: '🚚 Shipped', out_for_delivery: '🛵 Out for delivery', delivered: '✅ Delivered' };\nreturn $input.all().map(item => {\n  const c = item.json;\n  const orders = (c.orders || []).slice(0, 5);\n  let reply;\n  if (!orders.length) {\n    reply = 'Hi ' + c.name + '! Is number pe abhi tak koi order nahi hai. Instagram pe kisi post pe *price* comment karke product dekh sakte hain 🛍️';\n  } else {\n    const rows = orders.map(o => '*' + o.id + '* - ' + o.placedOn + NL + (LABEL[o.status] || o.status) + ' | ₹' + o.total.toLocaleString('en-IN'));\n    reply = 'Hi ' + c.name + '! Aapke recent orders:' + NL + NL + rows.join(NL + NL) + NL + NL + 'Kisi order ko track karne ke liye order number bhejiye (e.g. *ORD-10452*).';\n  }\n  return { json: { phone: c.phone, reply: reply } };\n});"
+      },
+      "id": "dd05fb64-afba-42b7-a00d-56cb5744f69c",
+      "name": "Format Order List",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1072,
+        1040
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const NL = String.fromCharCode(10);\nconst CATALOG = {\n  'sambalpuri-ikat-kurta-maroon': { title: 'Sambalpuri Ikat Cotton Kurta - Royal Maroon', price: 1599 },\n  'bomkai-silk-kurta-gold': { title: 'Bomkai Handloom Tussar Silk Kurta - Konark Gold', price: 3499 },\n  'kotpad-organic-kurta-earth': { title: 'Kotpad Tribal Weave Kurta - Terracotta Earth', price: 1899 },\n  'pasapalli-nehru-jacket-black': { title: 'Pasapalli Check Silk Nehru Jacket - Onyx & Red', price: 2899 }\n};\nreturn $input.all().map(item => {\n  const c = item.json;\n  const p = CATALOG[c.handle];\n  let reply;\n  if (!p) {\n    reply = 'Hi ' + c.name + '! Yeh product abhi catalog mein nahi mila. Please post pe dobara *price* comment karein ya *MENU* likhiye.';\n  } else {\n    const draft = 'DRAFT-' + String(Date.now()).slice(-6);\n    reply = [\n      'Great choice, ' + c.name + '! 🎉',\n      '',\n      '🛍️ *' + p.title + '*',\n      'Price: ₹' + p.price.toLocaleString('en-IN'),\n      '',\n      'Order confirm karne ke liye ek message mein bhejiye:',\n      '1) Size',\n      '2) Full delivery address with pincode',\n      '',\n      'Draft ref: ' + draft,\n      'Pay online: https://pay.odishamart.in/' + draft\n    ].join(NL);\n  }\n  return { json: { phone: c.phone, reply: reply } };\n});"
+      },
+      "id": "c8b0a026-e232-4ea5-9a46-80321c1936ab",
+      "name": "Prepare Order Confirmation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1072,
+        1200
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const NL = String.fromCharCode(10);\nreturn $input.all().map(item => {\n  const c = item.json;\n  const ref = c.orderId ? ' (' + c.orderId + ')' : '';\n  const reply = 'Hi ' + c.name + '! 🙏 Aapki request' + ref + ' note kar li gayi hai.' + NL + 'Hamari support team 2 ghante ke andar (10am-8pm) aapse isi chat pe contact karegi.' + NL + NL + 'Order status ke liye *TRACK* likhiye.';\n  return { json: { phone: c.phone, reply: reply } };\n});"
+      },
+      "id": "2f401740-04fa-46f6-a8a8-44fd677b8a4f",
+      "name": "Support Handoff Reply",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1072,
+        1360
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const NL = String.fromCharCode(10);\nreturn $input.all().map(item => {\n  const c = item.json;\n  const reply = ['Namaste ' + c.name + '! 👋 Main ODISHAMART ka order assistant hoon.', '', 'Aap yeh kar sakte hain:', '📦 *TRACK ORD-10452* - live order tracking', '🧾 *MY ORDERS* - recent orders', '🛍️ *ORDER <product-code>* - naya order', '↩️ *CANCEL / RETURN* - support request'].join(NL);\n  return { json: { phone: c.phone, reply: reply } };\n});"
+      },
+      "id": "3ce9a9ea-0c28-4083-8a9a-d6d44ec6c98a",
+      "name": "Menu Reply",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1072,
+        1520
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "order-status-update",
+        "options": {}
+      },
+      "id": "13dc8d50-2c56-4860-9899-a9680d14e1dd",
+      "name": "Order Status Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        1904
+      ],
+      "webhookId": "5a4331ff-7583-4adb-b3c3-592e81dd6ea3"
+    },
+    {
+      "parameters": {
+        "jsCode": "const MAP = { confirmed: 'order_confirmed_v1', shipped: 'order_shipped_v1', out_for_delivery: 'order_out_for_delivery_v1', delivered: 'order_delivered_v1' };\nconst out = [];\nfor (const item of $input.all()) {\n  const b = item.json.body || item.json;\n  const tpl = MAP[b.status];\n  if (!tpl || !b.phone) continue;\n  let detail = '';\n  if (b.status === 'confirmed') detail = b.itemTitle || 'your order';\n  else if (b.status === 'shipped') detail = (b.courier || 'Courier') + ' | AWB ' + (b.awb || '-') + ' | ' + (b.trackingUrl || '');\n  else if (b.status === 'out_for_delivery') detail = 'ETA: ' + (b.eta || 'today');\n  else detail = 'Delivered ' + (b.deliveredAt || 'today');\n  out.push({ json: {\n    phone: String(b.phone).replace(/[^0-9]/g, ''),\n    templateRef: tpl + '|en',\n    p1: b.customerName || 'Customer',\n    p2: b.orderId || '-',\n    p3: detail\n  } });\n}\nreturn out;"
+      },
+      "id": "1b53fd78-7ee2-4c8e-9dec-ff41091660f1",
+      "name": "Normalize Status Update",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        272,
+        1904
+      ]
+    },
+    {
+      "parameters": {
+        "phoneNumberId": "1073227029211574",
+        "recipientPhoneNumber": "={{ $json.phone }}",
+        "template": "={{ $json.templateRef }}",
+        "components": {
+          "component": [
+            {
+              "bodyParameters": {
+                "parameter": [
+                  {
+                    "text": "={{ $json.p1 }}"
+                  },
+                  {
+                    "text": "={{ $json.p2 }}"
+                  },
+                  {
+                    "text": "={{ $json.p3 }}"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "id": "28702582-1299-46e0-96f6-7ab213646a95",
+      "name": "Send Status Template",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        528,
+        1904
+      ],
+      "webhookId": "6105f44c-03b8-4b55-bb8d-99e6894f9f81",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "BjaFXuiyFNg1bVAy",
+          "name": "whatsapp permanent token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## SETUP CHECKLIST\n1. Meta App > Webhooks: Instagram (comments) + Page (feed) -> POST/GET URL = this workflow webhook path /meta-social-commerce, verify token = replora_meta_verify\n2. Permissions: instagram_manage_comments, instagram_manage_messages, pages_messaging, pages_manage_engagement\n3. Replace mock: set useMock=false in Store Config + real shopDomain, swap POST_MAP with Data Table lookup\n4. WhatsApp templates (body 3 vars {{1}} name, {{2}} order id, {{3}} detail): order_confirmed_v1, order_shipped_v1, order_out_for_delivery_v1, order_delivered_v1\n5. Real orders: replace Fetch Customer Orders (Mock) with Shopify Orders + courier tracking API",
+        "height": 384,
+        "width": 480,
+        "color": 4
+      },
+      "id": "afbf8dc7-9ede-45a6-9d6e-2e1c49106fe6",
+      "name": "Sticky Note bdf4d0e2",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -528,
+        -144
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## FLOW 1: Comment -> DM carousel\nIG/FB comment with buying keyword (price, kitna, details...) -> map post to product(s) -> fetch from Shopify/website -> send generic-template carousel as private reply + public reply. Falls back to text DM with links if carousel is rejected.",
+        "height": 240,
+        "width": 384,
+        "color": 5
+      },
+      "id": "f84abffd-948f-4cfb-88c9-7704768d900f",
+      "name": "Sticky Note a9cde8ce",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -528,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## FLOW 2: WhatsApp Order Desk\nCustomer messages the business number -> intent (track / my orders / new order / support / menu) -> reply. Tracking is phone-verified: only orders on the sender number are shown.",
+        "height": 176,
+        "width": 368,
+        "color": 6
+      },
+      "id": "6ce51869-78c3-4401-be75-717db58f193a",
+      "name": "Sticky Note 6d2b81d1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -528,
+        1008
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## FLOW 3: Proactive status updates\nShopify/courier webhook (POST /order-status-update) -> approved WhatsApp template -> customer gets live updates without asking.",
+        "height": 176,
+        "width": 320,
+        "color": 3
+      },
+      "id": "c3871dff-96a6-449d-9213-032110b54b23",
+      "name": "Sticky Note 5921d8dd",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -464,
+        1808
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Meta Webhook Verify (GET)": {
+      "main": [
+        [
+          {
+            "node": "Verify Token OK?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Token OK?": {
+      "main": [
+        [
+          {
+            "node": "Respond Challenge",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Forbidden",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Meta Comment Events (POST)": {
+      "main": [
+        [
+          {
+            "node": "Normalize Comment Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Comment Events": {
+      "main": [
+        [
+          {
+            "node": "Buying Intent?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buying Intent?": {
+      "main": [
+        [
+          {
+            "node": "Store Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Config": {
+      "main": [
+        [
+          {
+            "node": "Resolve Products for Post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve Products for Post": {
+      "main": [
+        [
+          {
+            "node": "Use Mock Data?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Use Mock Data?": {
+      "main": [
+        [
+          {
+            "node": "Mock Shopify Catalog",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fetch Product from Shopify Store",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mock Shopify Catalog": {
+      "main": [
+        [
+          {
+            "node": "Build Product Carousel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Product Carousel": {
+      "main": [
+        [
+          {
+            "node": "Send Product Carousel DM",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Public Reply on Comment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Product from Shopify Store": {
+      "main": [
+        [
+          {
+            "node": "Build Product Carousel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Product Carousel DM": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Fallback Text DM with Links",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatsApp Message Trigger": {
+      "main": [
+        [
+          {
+            "node": "Parse WhatsApp Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse WhatsApp Message": {
+      "main": [
+        [
+          {
+            "node": "Fetch Customer Orders (Mock)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Customer Orders (Mock)": {
+      "main": [
+        [
+          {
+            "node": "Route by Intent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Intent": {
+      "main": [
+        [
+          {
+            "node": "Format Tracking Reply",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Format Order List",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Order Confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Support Handoff Reply",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Menu Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Tracking Reply": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Order List": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Order Confirmation": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Support Handoff Reply": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Menu Reply": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Order Status Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize Status Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Status Update": {
+      "main": [
+        [
+          {
+            "node": "Send Status Template",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "versionId": "93e8a778-16d2-4915-943a-2dc08e3518e8",
+  "meta": {
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp",
+    "instanceId": "a02d9dd75e1472dd34ea6f0c2292e56e4c7f5268b29c8bd11d1743eeb468f68a"
+  },
+  "nodeGroups": [],
+  "tags": []
+}
